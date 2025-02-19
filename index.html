@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reminder App</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f9ff;
+        }
+        .reminder-card {
+            transition: transform 0.2s;
+        }
+        .reminder-card:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen">
+        <nav class="bg-white shadow-md">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <i class="bi bi-alarm text-2xl text-blue-500"></i>
+                        <span class="ml-2 text-xl font-semibold">Reminder App</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="mb-6">
+                <form id="reminderForm" class="bg-white rounded-lg shadow-md p-6">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Title</label>
+                            <input type="text" id="title" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Date & Time</label>
+                            <input type="datetime-local" id="datetime" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700">Description</label>
+                        <textarea id="description" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            Add Reminder
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="reminders" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <!-- Reminders will be dynamically added here -->
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadReminders();
+            checkPermission();
+        });
+
+        async function checkPermission() {
+            if ('Notification' in window) {
+                if (Notification.permission !== 'granted') {
+                    await Notification.requestPermission();
+                }
+            }
+        }
+
+        document.getElementById('reminderForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = document.getElementById('title').value;
+            const datetime = document.getElementById('datetime').value;
+            const description = document.getElementById('description').value;
+
+            addReminder(title, datetime, description);
+            e.target.reset();
+        });
+
+        function addReminder(title, datetime, description) {
+            const reminders = JSON.parse(localStorage.getItem('reminders') || '[]');
+            const reminder = {
+                id: Date.now(),
+                title,
+                datetime,
+                description
+            };
+            reminders.push(reminder);
+            localStorage.setItem('reminders', JSON.stringify(reminders));
+            
+            scheduleNotification(reminder);
+            loadReminders();
+        }
+
+        function loadReminders() {
+            const reminders = JSON.parse(localStorage.getItem('reminders') || '[]');
+            const container = document.getElementById('reminders');
+            container.innerHTML = '';
+
+            reminders.sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
+                .forEach(reminder => {
+                    const card = createReminderCard(reminder);
+                    container.appendChild(card);
+                });
+        }
+
+        function createReminderCard(reminder) {
+            const div = document.createElement('div');
+            div.className = 'reminder-card bg-white rounded-lg shadow-md p-6';
+            div.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <h3 class="text-lg font-semibold">${reminder.title}</h3>
+                    <button onclick="deleteReminder(${reminder.id})" class="text-red-500 hover:text-red-700">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 mt-2">
+                    <i class="bi bi-clock"></i> ${new Date(reminder.datetime).toLocaleString()}
+                </p>
+                <p class="mt-2 text-gray-700">${reminder.description || 'No description'}</p>
+            `;
+            return div;
+        }
+
+        function deleteReminder(id) {
+            const reminders = JSON.parse(localStorage.getItem('reminders') || '[]');
+            const updatedReminders = reminders.filter(r => r.id !== id);
+            localStorage.setItem('reminders', JSON.stringify(updatedReminders));
+            loadReminders();
+        }
+
+        function scheduleNotification(reminder) {
+            const now = new Date().getTime();
+            const reminderTime = new Date(reminder.datetime).getTime();
+            
+            if (reminderTime > now) {
+                setTimeout(() => {
+                    if (Notification.permission === 'granted') {
+                        new Notification(reminder.title, {
+                            body: reminder.description || 'Reminder!',
+                            icon: 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/icons/alarm.svg'
+                        });
+                    }
+                }, reminderTime - now);
+            }
+        }
+
+        // Check for due reminders every minute
+        setInterval(() => {
+            const reminders = JSON.parse(localStorage.getItem('reminders') || '[]');
+            const now = new Date();
+            
+            reminders.forEach(reminder => {
+                const reminderTime = new Date(reminder.datetime);
+                if (reminderTime <= now) {
+                    if (Notification.permission === 'granted') {
+                        new Notification(reminder.title, {
+                            body: reminder.description || 'Reminder!',
+                            icon: 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/icons/alarm.svg'
+                        });
+                    }
+                }
+            });
+        }, 60000);
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
